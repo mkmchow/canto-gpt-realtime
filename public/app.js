@@ -2,17 +2,27 @@
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
 const voiceSelect = document.getElementById('voiceSelect');
-const instructionsInput = document.getElementById('instructionsInput');
+const roleInput = document.getElementById('roleInput');
+const personalityInput = document.getElementById('personalityInput');
+const wordLimitInput = document.getElementById('wordLimitInput');
+const refineRoleBtn = document.getElementById('refineRoleBtn');
+const refinePersonalityBtn = document.getElementById('refinePersonalityBtn');
+const toggleConfigBtn = document.getElementById('toggleConfigBtn');
+const configSections = document.getElementById('configSections');
 const statusIndicator = document.getElementById('statusIndicator');
 const statusText = document.getElementById('statusText');
 const conversation = document.getElementById('conversation');
 const logContainer = document.getElementById('logContainer');
 const clearLogBtn = document.getElementById('clearLogBtn');
+const logSection = document.getElementById('logSection');
 
 // WebRTC components
 let peerConnection = null;
 let dataChannel = null;
 let audioElement = null;
+
+// State
+let currentAssistantMessage = null;
 
 // Event listeners
 startBtn.addEventListener('click', startSession);
@@ -21,11 +31,126 @@ clearLogBtn.addEventListener('click', () => {
     logContainer.innerHTML = '';
 });
 
+// Toggle config sections (mobile)
+toggleConfigBtn.addEventListener('click', () => {
+    if (configSections.style.display === 'none') {
+        configSections.style.display = 'block';
+        toggleConfigBtn.textContent = '⬆️ 隱藏設定';
+    } else {
+        configSections.style.display = 'none';
+        toggleConfigBtn.textContent = '⬇️ 顯示設定';
+    }
+});
+
+// Refine buttons
+refineRoleBtn.addEventListener('click', async () => {
+    await refinePrompt('role');
+});
+
+refinePersonalityBtn.addEventListener('click', async () => {
+    await refinePrompt('personality');
+});
+
+// Build system instructions from role, personality, and word limit
+function buildSystemInstructions() {
+    const role = roleInput.value.trim();
+    const personality = personalityInput.value.trim();
+    const wordLimit = wordLimitInput.value;
+
+    let instructions = '';
+
+    // Base instruction (always in Cantonese)
+    instructions = '你係一個AI助手，用廣東話同用戶對話。';
+
+    // Add role if provided
+    if (role) {
+        instructions += `\n\n你嘅身份：${role}`;
+    }
+
+    // Add personality if provided
+    if (personality) {
+        instructions += `\n\n你嘅性格同知識：${personality}`;
+    }
+
+    // Add word limit (override default if specified)
+    if (wordLimit) {
+        instructions += `\n\n重要：你嘅回覆最多${wordLimit}字。保持簡潔。`;
+    } else {
+        instructions += '\n\n重要：你嘅回覆盡量簡短，大概10-30字左右。保持簡潔。';
+    }
+
+    return instructions;
+}
+
+// Refine prompts using OpenRouter API (in Cantonese)
+async function refinePrompt(type) {
+    const isRole = type === 'role';
+    const button = isRole ? refineRoleBtn : refinePersonalityBtn;
+    const input = isRole ? roleInput : personalityInput;
+    const originalText = input.value.trim();
+
+    if (!originalText) {
+        alert(isRole ? '請先輸入AI身份' : '請先輸入AI性格同知識');
+        return;
+    }
+
+    // Disable button and show loading state
+    button.disabled = true;
+    button.classList.add('refining');
+    button.textContent = '優化中...';
+
+    try {
+        const systemPrompt = isRole
+            ? '你係一個AI助手，專門幫用戶優化佢哋嘅AI角色設定。用戶會俾你一個簡單嘅角色描述，你要將佢變得更詳細、更生動、更有用。用廣東話回覆，直接輸出優化後嘅內容，唔好加額外解釋。'
+            : '你係一個AI助手，專門幫用戶優化佢哋嘅AI性格同知識設定。用戶會俾你一個簡單嘅性格描述，你要將佢變得更詳細、更生動、更有用。用廣東話回覆，直接輸出優化後嘅內容，唔好加額外解釋。';
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer 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',
+                'HTTP-Referer': window.location.origin,
+            },
+            body: JSON.stringify({
+                model: 'openai/gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: originalText }
+                ]
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const refinedText = data.choices[0].message.content.trim();
+
+        // Update input with refined text
+        input.value = refinedText;
+        log(`✨ ${isRole ? '身份' : '性格'}已優化`, 'success');
+
+    } catch (error) {
+        console.error('Error refining prompt:', error);
+        log(`❌ 優化失敗: ${error.message}`, 'error');
+        alert('優化失敗，請稍後再試');
+    } finally {
+        // Restore button state
+        button.disabled = false;
+        button.classList.remove('refining');
+        button.textContent = '✨ 優化';
+    }
+}
+
 // Start a new session
 async function startSession() {
     try {
-        updateStatus('connecting', 'Requesting ephemeral key...');
-        log('Requesting ephemeral key from server...', 'info');
+        updateStatus('connecting', '正在連接...');
+        log('正在請求臨時密鑰...', 'info');
+
+        // Get system instructions
+        const instructions = buildSystemInstructions();
 
         // Get ephemeral key from backend
         const response = await fetch('/api/session', {
@@ -35,40 +160,55 @@ async function startSession() {
             },
             body: JSON.stringify({
                 voice: voiceSelect.value,
-                instructions: instructionsInput.value || undefined
+                instructions: instructions
             })
         });
 
         if (!response.ok) {
-            throw new Error('Failed to get ephemeral key');
+            throw new Error('無法獲取臨時密鑰');
         }
 
         const { sessionId, ephemeralKey, expiresAt } = await response.json();
         
-        log(`✅ Ephemeral key received (Session: ${sessionId})`, 'success');
-        log(`⏰ Expires at: ${new Date(expiresAt * 1000).toLocaleString()}`, 'info');
+        log(`✅ 臨時密鑰已接收 (Session: ${sessionId})`, 'success');
+        log(`⏰ 到期時間: ${new Date(expiresAt * 1000).toLocaleString()}`, 'info');
 
         // Initialize WebRTC connection
-        await initWebRTC(ephemeralKey);
+        await initWebRTC(ephemeralKey, instructions);
 
+        // Disable inputs during session
         startBtn.disabled = true;
         stopBtn.disabled = false;
         voiceSelect.disabled = true;
-        instructionsInput.disabled = true;
+        roleInput.disabled = true;
+        personalityInput.disabled = true;
+        wordLimitInput.disabled = true;
+        refineRoleBtn.disabled = true;
+        refinePersonalityBtn.disabled = true;
+
+        // Hide config on mobile after starting
+        if (window.innerWidth <= 767) {
+            configSections.style.display = 'none';
+            toggleConfigBtn.style.display = 'block';
+            toggleConfigBtn.textContent = '⬇️ 顯示設定';
+        }
+
+        // Clear conversation except system message
+        conversation.innerHTML = '';
 
     } catch (error) {
         console.error('Error starting session:', error);
-        log(`❌ Error: ${error.message}`, 'error');
-        updateStatus('error', 'Failed to start session');
-        addMessage('system', `Error: ${error.message}`);
+        log(`❌ 錯誤: ${error.message}`, 'error');
+        updateStatus('error', '連接失敗');
+        addMessage('system', `錯誤: ${error.message}`);
     }
 }
 
 // Initialize WebRTC peer connection
-async function initWebRTC(ephemeralKey) {
+async function initWebRTC(ephemeralKey, instructions) {
     try {
-        updateStatus('connecting', 'Setting up WebRTC connection...');
-        log('Creating RTCPeerConnection...', 'info');
+        updateStatus('connecting', '正在建立WebRTC連接...');
+        log('正在創建RTCPeerConnection...', 'info');
 
         // Create peer connection
         peerConnection = new RTCPeerConnection();
@@ -79,12 +219,12 @@ async function initWebRTC(ephemeralKey) {
         document.body.appendChild(audioElement);
 
         peerConnection.ontrack = (event) => {
-            log('📡 Received remote audio track', 'success');
+            log('📡 收到遠程音頻軌道', 'success');
             audioElement.srcObject = event.streams[0];
         };
 
         // Get user microphone
-        log('🎤 Requesting microphone access...', 'info');
+        log('🎤 正在請求麥克風權限...', 'info');
         const clientMedia = await navigator.mediaDevices.getUserMedia({ 
             audio: {
                 echoCancellation: true,
@@ -93,16 +233,16 @@ async function initWebRTC(ephemeralKey) {
             }
         });
         
-        log('✅ Microphone access granted', 'success');
+        log('✅ 麥克風權限已授予', 'success');
         const audioTrack = clientMedia.getAudioTracks()[0];
         peerConnection.addTrack(audioTrack);
 
         // Create data channel for events
         dataChannel = peerConnection.createDataChannel('realtime-channel');
-        setupDataChannel(dataChannel);
+        setupDataChannel(dataChannel, instructions);
 
         // Create and set local offer
-        log('📝 Creating SDP offer...', 'info');
+        log('📝 正在創建SDP offer...', 'info');
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
@@ -111,7 +251,7 @@ async function initWebRTC(ephemeralKey) {
         const deployment = 'gpt-realtime';
         const webrtcUrl = `https://${region}.realtimeapi-preview.ai.azure.com/v1/realtimertc?model=${deployment}`;
         
-        log(`🌐 Connecting to: ${webrtcUrl}`, 'info');
+        log(`🌐 正在連接: ${webrtcUrl}`, 'info');
 
         const sdpResponse = await fetch(webrtcUrl, {
             method: 'POST',
@@ -123,15 +263,15 @@ async function initWebRTC(ephemeralKey) {
         });
 
         if (!sdpResponse.ok) {
-            throw new Error(`WebRTC connection failed: ${sdpResponse.status}`);
+            throw new Error(`WebRTC連接失敗: ${sdpResponse.status}`);
         }
 
         const answerSdp = await sdpResponse.text();
         const answer = { type: 'answer', sdp: answerSdp };
         await peerConnection.setRemoteDescription(answer);
 
-        log('✅ WebRTC connection established!', 'success');
-        updateStatus('connected', 'Connected - Start speaking!');
+        log('✅ WebRTC連接已建立！', 'success');
+        updateStatus('connected', '已連接 - 開始講嘢！');
 
     } catch (error) {
         console.error('Error initializing WebRTC:', error);
@@ -140,13 +280,12 @@ async function initWebRTC(ephemeralKey) {
 }
 
 // Set up data channel event handlers
-function setupDataChannel(channel) {
+function setupDataChannel(channel, instructions) {
     channel.addEventListener('open', () => {
-        log('📢 Data channel opened', 'success');
-        updateStatus('listening', 'Listening...');
+        log('📢 數據頻道已打開', 'success');
+        updateStatus('listening', '聆聽中...');
         
         // Send session update with instructions
-        const instructions = instructionsInput.value.trim();
         if (instructions) {
             const event = {
                 type: 'session.update',
@@ -155,7 +294,7 @@ function setupDataChannel(channel) {
                 }
             };
             channel.send(JSON.stringify(event));
-            log('📤 Sent session.update', 'info');
+            log('📤 已發送 session.update', 'info');
         }
     });
 
@@ -165,12 +304,12 @@ function setupDataChannel(channel) {
     });
 
     channel.addEventListener('close', () => {
-        log('📢 Data channel closed', 'warning');
-        updateStatus('disconnected', 'Disconnected');
+        log('📢 數據頻道已關閉', 'warning');
+        updateStatus('disconnected', '已斷開');
     });
 
     channel.addEventListener('error', (error) => {
-        log(`❌ Data channel error: ${error}`, 'error');
+        log(`❌ 數據頻道錯誤: ${error}`, 'error');
     });
 }
 
@@ -180,19 +319,19 @@ function handleRealtimeEvent(event) {
 
     switch (event.type) {
         case 'session.created':
-            addMessage('system', `Session created with model: ${event.session.model}`);
+            addMessage('system', `會話已創建 (模型: ${event.session.model})`);
             break;
 
         case 'session.updated':
-            addMessage('system', 'Session configuration updated');
+            addMessage('system', '會話配置已更新');
             break;
 
         case 'input_audio_buffer.speech_started':
-            updateStatus('listening', 'You are speaking...');
+            updateStatus('listening', '你正在說話...');
             break;
 
         case 'input_audio_buffer.speech_stopped':
-            updateStatus('connected', 'Processing...');
+            updateStatus('connected', '處理中...');
             break;
 
         case 'conversation.item.input_audio_transcription.completed':
@@ -210,28 +349,26 @@ function handleRealtimeEvent(event) {
             break;
 
         case 'response.created':
-            updateStatus('speaking', 'AI is speaking...');
+            updateStatus('speaking', 'AI正在說話...');
             break;
 
         case 'response.done':
-            updateStatus('listening', 'Listening...');
+            updateStatus('listening', '聆聽中...');
             break;
 
         case 'error':
-            log(`❌ Error: ${event.error.message}`, 'error');
-            addMessage('system', `Error: ${event.error.message}`);
+            log(`❌ 錯誤: ${event.error.message}`, 'error');
+            addMessage('system', `錯誤: ${event.error.message}`);
             break;
     }
 }
 
 // UI update functions
-let currentAssistantMessage = null;
-
 function updateAssistantMessage(delta) {
     if (!currentAssistantMessage) {
         currentAssistantMessage = document.createElement('div');
         currentAssistantMessage.className = 'message assistant-message';
-        currentAssistantMessage.innerHTML = '<strong>Assistant:</strong> <span class="text"></span>';
+        currentAssistantMessage.innerHTML = '<strong>AI:</strong> <span class="text"></span>';
         conversation.appendChild(currentAssistantMessage);
     }
     
@@ -253,13 +390,13 @@ function addMessage(role, text) {
     
     if (role === 'user') {
         messageDiv.className = 'message user-message';
-        messageDiv.innerHTML = `<strong>You:</strong> ${text}`;
+        messageDiv.innerHTML = `<strong>你:</strong> <span class="text">${text}</span>`;
     } else if (role === 'assistant') {
         messageDiv.className = 'message assistant-message';
-        messageDiv.innerHTML = `<strong>Assistant:</strong> ${text}`;
+        messageDiv.innerHTML = `<strong>AI:</strong> <span class="text">${text}</span>`;
     } else {
         messageDiv.className = 'message system-message';
-        messageDiv.innerHTML = `<strong>System:</strong> ${text}`;
+        messageDiv.textContent = text;
     }
     
     conversation.appendChild(messageDiv);
@@ -281,7 +418,7 @@ function log(message, type = 'info') {
 
 // Stop session
 function stopSession() {
-    log('Stopping session...', 'warning');
+    log('正在停止會話...', 'warning');
 
     if (dataChannel) {
         dataChannel.close();
@@ -301,14 +438,22 @@ function stopSession() {
     startBtn.disabled = false;
     stopBtn.disabled = true;
     voiceSelect.disabled = false;
-    instructionsInput.disabled = false;
+    roleInput.disabled = false;
+    personalityInput.disabled = false;
+    wordLimitInput.disabled = false;
+    refineRoleBtn.disabled = false;
+    refinePersonalityBtn.disabled = false;
 
-    updateStatus('disconnected', 'Session ended');
-    addMessage('system', 'Session ended');
-    log('✅ Session stopped', 'success');
+    // Show config sections on mobile
+    if (window.innerWidth <= 767) {
+        toggleConfigBtn.style.display = 'none';
+        configSections.style.display = 'block';
+    }
+
+    updateStatus('disconnected', '會話已結束');
+    addMessage('system', '會話已結束');
+    log('✅ 會話已停止', 'success');
 }
 
 // Initial message
-addMessage('system', 'Click "Start Session" to begin. Make sure to allow microphone access when prompted.');
-
-
+addMessage('system', '準備好後按「開始對話」');

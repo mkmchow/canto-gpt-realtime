@@ -1,67 +1,116 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Azure OpenAI Realtime (WebRTC)</title>
+    <title>🥡 喂喂機 WebRTC</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎙️ Azure OpenAI Realtime API</h1>
-            <p class="subtitle">WebRTC Implementation - Playground Quality</p>
+            <h1>🥡 喂喂機</h1>
+            <p class="subtitle">WebRTC 實時語音</p>
         </header>
 
-        <div class="status-card">
-            <div class="status-indicator" id="statusIndicator">
-                <span class="status-dot"></span>
-                <span id="statusText">Ready to connect</span>
+        <div class="scrollable-content">
+            <button id="toggleConfigBtn" class="toggle-config-btn" style="display: none;">⬇️ 顯示設定</button>
+
+            <div id="configSections">
+                <div class="config-section">
+                    <div class="form-group">
+                        <label for="voiceSelect">🎤 聲音</label>
+                        <select id="voiceSelect" class="select-input">
+                            <option value="alloy">Alloy</option>
+                            <option value="echo">Echo</option>
+                            <option value="shimmer">Shimmer</option>
+                            <option value="verse">Verse</option>
+                            <option value="fable">Fable</option>
+                            <option value="onyx">Onyx</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="roleInput">
+                            <span>👤 AI身份</span>
+                            <button id="refineRoleBtn" class="refine-btn">✨ 優化</button>
+                        </label>
+                        <input 
+                            type="text"
+                            id="roleInput" 
+                            class="text-input" 
+                            placeholder="例如：一名餐廳接待員、耐心嘅老師、香港美食專家、幽默風趣嘅朋友..."
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="personalityInput">
+                            <span>🎭 AI性格同知識</span>
+                            <button id="refinePersonalityBtn" class="refine-btn">✨ 優化</button>
+                        </label>
+                        <textarea 
+                            id="personalityInput" 
+                            class="textarea-input" 
+                            placeholder="例如：你好有耐性，鍾意用簡單嘅例子解釋嘢、你識好多香港文化..."
+                        ></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="wordLimitInput">📝 AI回覆字數限制</label>
+                        <select id="wordLimitInput" class="select-input">
+                            <option value="">使用預設值 (10-30字)</option>
+                            <option value="10">10字</option>
+                            <option value="20">20字</option>
+                            <option value="30">30字</option>
+                            <option value="40">40字</option>
+                            <option value="50">50字</option>
+                            <option value="60">60字</option>
+                            <option value="70">70字</option>
+                            <option value="80">80字</option>
+                            <option value="90">90字</option>
+                            <option value="100">100字</option>
+                            <option value="110">110字</option>
+                            <option value="120">120字</option>
+                            <option value="130">130字</option>
+                            <option value="140">140字</option>
+                            <option value="150">150字</option>
+                            <option value="160">160字</option>
+                            <option value="170">170字</option>
+                            <option value="180">180字</option>
+                            <option value="190">190字</option>
+                            <option value="200">200字</option>
+                        </select>
+                        <div class="hint-text">
+                            設定AI每次回覆最多嘅字數。數字越細，回覆越快。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="conversation" id="conversation">
+                <div class="message system-message">
+                    準備好後按「開始對話」<br>
+                    <small style="margin-top: 10px; display: block;">確保允許麥克風使用權限</small>
+                </div>
             </div>
         </div>
 
-        <div class="config-section">
-            <div class="form-group">
-                <label for="voiceSelect">Voice</label>
-                <select id="voiceSelect">
-                    <option value="alloy">Alloy</option>
-                    <option value="echo">Echo</option>
-                    <option value="shimmer">Shimmer</option>
-                    <option value="verse">Verse</option>
-                    <option value="fable">Fable</option>
-                    <option value="onyx">Onyx</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="instructionsInput">System Instructions</label>
-                <textarea 
-                    id="instructionsInput" 
-                    rows="3" 
-                    placeholder="You are a helpful and friendly assistant. Speak naturally and conversationally."
-                >You are a helpful and friendly assistant. Speak naturally and conversationally.</textarea>
+        <div class="sticky-status">
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot"></span>
+                <span id="statusText">未連接</span>
             </div>
         </div>
 
         <div class="controls">
-            <button id="startBtn" class="btn btn-primary">
-                🎤 Start Session
-            </button>
-            <button id="stopBtn" class="btn btn-secondary" disabled>
-                ⏹️ Stop Session
-            </button>
+            <button id="startBtn" class="btn btn-primary">開始對話</button>
+            <button id="stopBtn" class="btn btn-danger" disabled>停止</button>
         </div>
 
-        <div class="conversation" id="conversation">
-            <div class="message system-message">
-                <strong>System:</strong> Click "Start Session" to begin. Make sure to allow microphone access.
-            </div>
-        </div>
-
-        <div class="log-section">
+        <div class="log-section" id="logSection">
             <div class="log-header">
-                <h3>Event Log</h3>
-                <button id="clearLogBtn" class="btn-small">Clear</button>
+                <h3>事件記錄</h3>
+                <button id="clearLogBtn" class="btn-small">清除</button>
             </div>
             <div class="log-container" id="logContainer"></div>
         </div>
