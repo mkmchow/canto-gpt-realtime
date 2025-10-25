@@ -1,6 +1,6 @@
-# Azure OpenAI Realtime API - WebRTC Implementation
+# 🥡 喂喂機 (WebRTC 版本)
 
-This project uses the **Azure OpenAI Realtime API via WebRTC** to provide low-latency, real-time voice conversations - matching the quality of the Azure AI Foundry Playground.
+This project uses the **Azure OpenAI Realtime API via WebRTC** to provide low-latency, real-time voice conversations in **Cantonese** - matching the quality of the Azure AI Foundry Playground.
 
 ## 🎯 Why WebRTC?
 
@@ -105,10 +105,16 @@ Speaker ← RTC Audio Track ←────────────────�
 ## 🎙️ Features
 
 - **Low-latency voice interaction** (same quality as Azure playground)
+- **Cantonese UI** optimized for Hong Kong market
 - **Real-time transcription** of user speech
 - **Interruption support** (interrupt AI at any time)
 - **Voice selection** (alloy, echo, shimmer, verse, fable, onyx)
-- **Custom instructions** for AI personality
+- **Split system prompts**:
+  - 👤 AI身份 (AI Identity/Role)
+  - 🎭 AI性格同知識 (AI Personality + Knowledge)
+  - 📝 AI回覆字數限制 (Word Count Limit)
+- **AI prompt refinement** using OpenRouter API (in Cantonese)
+- **Mobile-optimized** with responsive layout
 - **Event logging** for debugging
 - **Beautiful UI** with status indicators
 
