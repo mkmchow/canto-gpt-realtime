@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure OpenAI Realtime (WebRTC)</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ Azure OpenAI Realtime API</h1>
+            <p class="subtitle">WebRTC Implementation - Playground Quality</p>
+        </header>
+
+        <div class="status-card">
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot"></span>
+                <span id="statusText">Ready to connect</span>
+            </div>
+        </div>
+
+        <div class="config-section">
+            <div class="form-group">
+                <label for="voiceSelect">Voice</label>
+                <select id="voiceSelect">
+                    <option value="alloy">Alloy</option>
+                    <option value="echo">Echo</option>
+                    <option value="shimmer">Shimmer</option>
+                    <option value="verse">Verse</option>
+                    <option value="fable">Fable</option>
+                    <option value="onyx">Onyx</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="instructionsInput">System Instructions</label>
+                <textarea 
+                    id="instructionsInput" 
+                    rows="3" 
+                    placeholder="You are a helpful and friendly assistant. Speak naturally and conversationally."
+                >You are a helpful and friendly assistant. Speak naturally and conversationally.</textarea>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn btn-primary">
+                🎤 Start Session
+            </button>
+            <button id="stopBtn" class="btn btn-secondary" disabled>
+                ⏹️ Stop Session
+            </button>
+        </div>
+
+        <div class="conversation" id="conversation">
+            <div class="message system-message">
+                <strong>System:</strong> Click "Start Session" to begin. Make sure to allow microphone access.
+            </div>
+        </div>
+
+        <div class="log-section">
+            <div class="log-header">
+                <h3>Event Log</h3>
+                <button id="clearLogBtn" class="btn-small">Clear</button>
+            </div>
+            <div class="log-container" id="logContainer"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
+

@@ -1,0 +1,12 @@
+# Copy this file to .env and fill in your Azure OpenAI credentials
+
+# Azure OpenAI Configuration for WebRTC
+AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
+AZURE_OPENAI_API_KEY=your_api_key_here
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-realtime
+AZURE_REGION=eastus2
+
+# Server Configuration
+PORT=3000
+
+
